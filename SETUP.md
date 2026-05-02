@@ -160,6 +160,42 @@ npm run dev
 
 Open http://localhost:3000. You're running against a fully local database.
 
+### Granting yourself staff access
+
+`is_staff` is a flag on your user record that unlocks the future admin panel and lets you manage approved emails across all schools. It can only be set directly in the database — there's no UI for it, by design.
+
+After signing up, open Supabase Studio at http://localhost:54323, click **SQL Editor**, and run:
+
+```sql
+UPDATE public.users
+SET is_staff = true
+WHERE id = (
+  SELECT id FROM auth.users WHERE email = 'your@email.com'
+);
+```
+
+Replace `your@email.com` with the address you signed up with. You only need to do this once — the flag persists across `supabase stop` / `supabase start` cycles.
+
+For remote/production, run the same query in the Supabase dashboard SQL editor.
+
+### Adding an approved email (bypass domain check)
+
+Once you have staff access, you can whitelist any email address for a school. In Studio SQL Editor:
+
+```sql
+INSERT INTO approved_emails (email, school_id, note, added_by)
+SELECT
+  'your.personal@gmail.com',
+  s.id,
+  'Developer testing account',
+  u.id
+FROM schools s, auth.users u
+WHERE s.short_name = 'BMC'
+  AND u.email = 'your.personal@gmail.com';
+```
+
+Org admins can do the same for their school's members via the future admin UI.
+
 ### Useful local URLs
 
 | URL | What it is |

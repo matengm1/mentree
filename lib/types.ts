@@ -18,6 +18,16 @@ export interface School {
 
 export interface User {
   id: string
+  is_staff: boolean
+  created_at: string
+}
+
+export interface ApprovedEmail {
+  id: string
+  email: string
+  school_id: string
+  note: string | null
+  added_by: string | null
   created_at: string
 }
 
@@ -115,7 +125,12 @@ export type Database = {
       users: {
         Row: User
         Insert: Pick<User, 'id'>
-        Update: never
+        Update: Pick<User, 'is_staff'>
+      }
+      approved_emails: {
+        Row: ApprovedEmail
+        Insert: Omit<ApprovedEmail, 'id' | 'created_at'>
+        Update: Partial<Omit<ApprovedEmail, 'id' | 'created_at'>>
       }
       profiles: {
         Row: Profile
@@ -144,6 +159,10 @@ export type Database = {
       }
     }
     Functions: {
+      is_mentree_staff: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
       create_organization: {
         Args: {
           p_school_id: string

@@ -47,10 +47,11 @@ A web app to track mentor-mentee lineage within college organizations — starti
 ## Data Model
 
 ```
-users           — auth anchor (maps to Supabase auth.users)
+users           — auth anchor (maps to Supabase auth.users); carries is_staff flag
   └── profiles  — academic identity per school; can be ghost (no auth account)
 
 schools
+  ├── approved_emails     — specific addresses exempt from domain verification
   └── organizations
         ├── memberships     — links profiles to orgs with a role
         └── family_relationships — the tree edges (parent → child)
