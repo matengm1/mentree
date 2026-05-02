@@ -160,6 +160,21 @@ npm run dev
 
 Open http://localhost:3000. You're running against a fully local database.
 
+### Creating a test account from the command line
+
+Instead of going through the signup form, you can create a pre-confirmed account directly:
+
+```bash
+npm run create-dev-user -- --email you@example.com
+npm run create-dev-user -- --email you@example.com --password mypassword
+```
+
+Default password if you omit `--password` is `devpassword123`.
+
+The script talks to the local Supabase Admin API and marks the email as already confirmed, so you can sign in immediately at http://localhost:3000/login. It will refuse to run against anything other than the local instance (`127.0.0.1:54321`).
+
+When the script succeeds it prints the user's ID and reminds you of the SQL to grant staff access if you need it.
+
 ### Granting yourself staff access
 
 `is_staff` is a flag on your user record that unlocks the future admin panel and lets you manage approved emails across all schools. It can only be set directly in the database — there's no UI for it, by design.
@@ -430,6 +445,9 @@ The `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (formerly the "anon key") identifies 
 
 **`supabase: command not found`**
 → The CLI isn't installed or your terminal's PATH doesn't include Homebrew's bin directory. Run `brew install supabase/tap/supabase` and open a fresh terminal window.
+
+**Sign up shows "check your email" on local dev**
+→ Either the config change wasn't picked up or `.env.local` is pointing at the remote Supabase. Try `supabase stop && supabase start` to reload `config.toml`, and verify `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` is `http://127.0.0.1:54321`. Alternatively, skip the form entirely and use `npm run create-dev-user` instead.
 
 **Sign up succeeds locally but I'm not logged in**
 → Email confirmations are disabled locally — you should be logged in immediately. If you're not, check that your `.env.local` is pointing to the local URL (`http://127.0.0.1:54321`), not the remote one.

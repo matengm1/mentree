@@ -28,7 +28,7 @@ export default function AuthForm({ mode, redirectTo = '/dashboard' }: AuthFormPr
 
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -36,7 +36,14 @@ export default function AuthForm({ mode, redirectTo = '/dashboard' }: AuthFormPr
           },
         })
         if (error) throw error
-        setEmailSent(true)
+        // When email confirmation is disabled (local dev), Supabase returns a
+        // live session immediately. Redirect rather than showing the email prompt.
+        if (data.session) {
+          router.push(redirectTo)
+          router.refresh()
+        } else {
+          setEmailSent(true)
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
