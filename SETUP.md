@@ -35,7 +35,178 @@ Then replace `npm` with `pnpm` in all commands below.
 
 ---
 
-## Step 1: Set Up Supabase
+## Local Development (Fully Offline, Isolated Data)
+
+This section is about running the entire stack — database, auth, everything — on your own machine with no internet required and no shared data. This is the recommended way to do day-to-day development.
+
+**Skip this if** you just want to deploy quickly and don't mind your dev work going into the remote database. In that case, jump to Step 1.
+
+### How it works
+
+The Supabase CLI uses Docker to run a miniature version of all Supabase services on your laptop: a real Postgres database, the auth system, a visual database browser, and a fake email inbox. Everything is isolated — data you create locally never touches the cloud. When you're done working, you shut it down.
+
+```
+Your browser → Next.js dev server (localhost:3000)
+                     ↓
+              Local Supabase (localhost:54321)
+                     ↓
+              Local Postgres database (localhost:54322)
+```
+
+### Prerequisites: A Docker runtime and the Supabase CLI
+
+The Supabase CLI needs a running Docker-compatible daemon. Any of these work — pick whichever you already have:
+
+**Option A — Colima (recommended if you already have it)**
+
+Colima is a lightweight, free container runtime for Mac. If you have it, you're already set. Just start it before running Supabase:
+
+```bash
+colima start
+```
+
+Verify the Docker CLI is pointed at Colima's socket:
+```bash
+docker context ls   # colima should be marked with *
+```
+
+If it's not active: `docker context use colima`
+
+**Option B — Docker Desktop (if you don't have Colima)**
+
+1. Go to https://www.docker.com/products/docker-desktop
+2. Download the Mac version and drag to Applications
+3. Launch Docker — wait for the whale icon in the menu bar to stop animating (~30–60s)
+
+You do **not** need a Docker account. It just needs to be running in the background.
+
+---
+
+**Supabase CLI** is the command-line tool that manages the local stack.
+
+Install it with Homebrew (the standard Mac package manager):
+```bash
+brew install supabase/tap/supabase
+```
+
+If you don't have Homebrew:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+Then re-run the `brew install` command.
+
+Verify: `supabase --version` should print a version number.
+
+### Start the local Supabase stack
+
+Make sure your Docker runtime is running (Colima: `colima start` / Docker Desktop: whale in menu bar), then from this project's directory:
+
+```bash
+supabase start
+```
+
+The first time you run this, it downloads the Supabase Docker images (~1GB). This takes a few minutes. After the first time it starts in about 10 seconds.
+
+When it's done, you'll see output like this (modern Supabase CLI uses a boxed format):
+
+```
+Started supabase local development setup.
+
+  Project URL: http://127.0.0.1:54321
+  Studio URL:  http://127.0.0.1:54323
+  Mailpit URL: http://127.0.0.1:54324
+  DB URL:      postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+  Authentication Keys
+    Publishable: sb_publishable_...
+    Secret:      sb_secret_...
+```
+
+The publishable key in that output is the same for every local Supabase project — that's expected. It's a well-known test key, not a real secret. (The CLI also prints legacy `ANON_KEY` / `SERVICE_ROLE_KEY` JWTs if you run `supabase status -o env`, but this project doesn't use them — see the note in the env section below.)
+
+**What also just happened automatically:**
+- All migration files in `supabase/migrations/` were applied (your full schema is set up)
+- `supabase/seed.sql` ran (Bryn Mawr College is in the schools table)
+
+You don't need to manually paste SQL or create seed data like the remote setup requires.
+
+### Configure environment variables for local
+
+```bash
+cp .env.local.example .env.local
+```
+
+Open `.env.local` and set it to the **local** values. The URL is hardcoded (it's always the same locally), and the publishable key is printed by `supabase status` — look for `PUBLISHABLE_KEY`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+To grab the local publishable key without scrolling the startup banner, run:
+
+```bash
+supabase status -o env | grep PUBLISHABLE_KEY
+```
+
+> **Note on the legacy anon key.** The Supabase CLI still prints a JWT-style `ANON_KEY` for backward compatibility, but Supabase has moved to a new key system (`sb_publishable_...` for clients, `sb_secret_...` for servers). This project uses the new keys exclusively. The legacy `anon` and `service_role` keys are scheduled for removal in late 2026, so don't fall back to them.
+
+### Install dependencies and start the app
+
+```bash
+npm install   # only needed the first time, or after package.json changes
+npm run dev
+```
+
+Open http://localhost:3000. You're running against a fully local database.
+
+### Useful local URLs
+
+| URL | What it is |
+|---|---|
+| http://localhost:3000 | The app |
+| http://localhost:54323 | Supabase Studio — visual database browser, run queries, inspect tables |
+| http://localhost:54324 | Inbucket — catches all emails the app sends so you can inspect them (sign-up confirmation links will appear here) |
+
+### Email confirmation locally
+
+Locally, email confirmation is **disabled** — you can sign up and immediately use the app without clicking a confirmation link. This makes development faster.
+
+If you do want to test the confirmation email flow, visit Inbucket at http://localhost:54324. Every email the app sends (confirmation links, future notifications) appears there as if it's a real inbox. No real emails are ever sent.
+
+### Stopping and resuming
+
+```bash
+supabase stop           # shut down — preserves your local data
+supabase stop --no-backup  # shut down and wipe the local database (fresh start)
+supabase start          # start again — your data is still there (unless you used --no-backup)
+```
+
+Data persists between `supabase stop` / `supabase start` cycles. It's like pausing and resuming.
+
+### Switching between local and remote
+
+Your `.env.local` determines which database the app talks to. To switch:
+
+- **Local**: `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` + the local publishable key (`supabase status -o env`)
+- **Remote**: `NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co` + your remote publishable key (Supabase dashboard → Project Settings → API Keys → Publishable)
+
+It's just two lines in one file. You can keep both sets of values commented out and toggle between them. Changes take effect the next time you restart `npm run dev`.
+
+### Adding new migrations locally
+
+When you change the schema (add a table, add a column, etc.):
+
+1. Write a new file in `supabase/migrations/` named `0002_description.sql`
+2. Run `supabase db reset` — this wipes local data and replays all migrations + seed from scratch
+
+`supabase db reset` is the standard way to apply new migrations locally. It's destructive (wipes data) but that's fine for development.
+
+---
+
+## Step 1: Set Up Supabase (Remote / Production)
+
+> **Only needed for deployment.** If you're developing locally, the section above covers everything. Come back here when you're ready to go live.
 
 ### Create an Account and Project
 
@@ -121,10 +292,12 @@ Environment variables are settings the app reads at runtime — things like API 
 2. Open `.env.local` in your text editor and fill in the values from Step 1:
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...your-anon-key...
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    ```
 
-`.env.local` is in `.gitignore` — it will never be committed to git. Never share these values publicly (though the anon key is relatively safe — Supabase's row-level security controls what it can access).
+   > Find the publishable key in the Supabase dashboard under **Project Settings → API Keys → Publishable**. Make sure you copy the new `sb_publishable_...` value, not the legacy `anon` JWT under the "Legacy" tab.
+
+`.env.local` is in `.gitignore` — it will never be committed to git. Never share these values publicly (though the publishable key is relatively safe — Supabase's row-level security controls what it can access).
 
 ---
 
@@ -176,7 +349,7 @@ Then create a new repo on GitHub (go to github.com → New repository) and follo
 3. Vercel auto-detects it's a Next.js project — no configuration changes needed
 4. Click **Environment Variables** and add the same two variables from your `.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 5. Click **Deploy**
 
 Vercel builds and deploys. After a minute you'll get a live URL like `https://mentree-abc123.vercel.app`.
@@ -207,11 +380,26 @@ When a user signs up:
 5. Supabase sets a session cookie; every subsequent request includes this cookie
 6. Your middleware reads the cookie, validates the session, and redirects unauthenticated users away from protected routes
 
-The `NEXT_PUBLIC_SUPABASE_ANON_KEY` is a JWT that identifies your project. Row Level Security (RLS) policies then determine what each authenticated user can actually read or write. The anon key alone doesn't grant access to anything sensitive.
+The `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (formerly the "anon key") identifies your project. Row Level Security (RLS) policies then determine what each authenticated user can actually read or write. The publishable key alone doesn't grant access to anything sensitive — it's safe to ship in browser bundles.
 
 ---
 
 ## Troubleshooting
+
+**`supabase start` fails immediately with "Cannot connect to the Docker daemon"**
+→ Your Docker runtime isn't running. If using Colima: `colima start`. If using Docker Desktop: open it and wait for the whale icon to stop animating. Then retry.
+
+**`supabase start` hangs for more than 5 minutes**
+→ It's probably downloading Docker images for the first time on a slow connection. Let it run. If it truly stalls, `Ctrl+C`, then `supabase stop --no-backup` and `supabase start` again.
+
+**`supabase: command not found`**
+→ The CLI isn't installed or your terminal's PATH doesn't include Homebrew's bin directory. Run `brew install supabase/tap/supabase` and open a fresh terminal window.
+
+**Sign up succeeds locally but I'm not logged in**
+→ Email confirmations are disabled locally — you should be logged in immediately. If you're not, check that your `.env.local` is pointing to the local URL (`http://127.0.0.1:54321`), not the remote one.
+
+**I can't find the confirmation email**
+→ Locally, go to http://localhost:54324 (Inbucket). All emails appear there — no real email is ever sent. On remote/production, check your spam folder; the email comes from Supabase's default sender.
 
 **"Module not found" error when running `npm run dev`**
 → Run `npm install` again. Something didn't install correctly.

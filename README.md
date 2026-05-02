@@ -142,7 +142,7 @@ See `.env.local.example` for the full list. Required to run locally:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
 See `SETUP.md` for where to find these values.

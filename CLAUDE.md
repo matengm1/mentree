@@ -53,7 +53,9 @@ Do not leave documentation that contradicts the current behavior. Outdated docs 
 
 **Database functions:** Prefer Postgres functions (in migrations) over multi-step API logic for operations that need to be atomic (e.g., creating an org + adding the creator as owner in one transaction).
 
-**Environment variables:** Anything prefixed `NEXT_PUBLIC_` is visible to the browser. Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` should be public. The anon key is safe to expose — RLS prevents misuse. The service role key must never be prefixed `NEXT_PUBLIC_`.
+**Environment variables:** Anything prefixed `NEXT_PUBLIC_` is visible to the browser. Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` should be public. The publishable key (`sb_publishable_...`) is safe to expose — RLS prevents misuse. Any secret key (`sb_secret_...`, formerly the service role key) must never be prefixed `NEXT_PUBLIC_` and must only be read in server-side code.
+
+**API keys (new vs legacy):** This project uses Supabase's new key system (`sb_publishable_...` and `sb_secret_...`), not the legacy JWT-based `anon` / `service_role` keys. Don't reintroduce env var names like `SUPABASE_ANON_KEY` or `SUPABASE_SERVICE_ROLE_KEY` — the legacy keys are scheduled for removal in late 2026.
 
 ---
 
